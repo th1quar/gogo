@@ -1,0 +1,197 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>rbx website executor</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background-color: #1e1e1e;
+            color: #d4d4d4;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .container {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            width: 90vw;
+            max-width: 1200px;
+            height: 70vh;
+            background-color: #252526;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            padding: 15px;
+            box-sizing: border-box;
+        }
+
+        .editor {
+            flex: 1;
+            border: 1px solid #333;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .buttons {
+            display: flex;
+            justify-content: flex-start;
+            margin-top: 10px;
+        }
+
+        .buttons button {
+            background-color: #007acc;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            padding: 10px 20px;
+            margin-right: 10px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s, transform 0.1s;
+        }
+
+        .buttons button:active {
+            transform: scale(0.98);
+        }
+
+        .buttons button:hover {
+            background-color: #005f8c;
+        }
+
+        .status-bar {
+            margin-top: 10px;
+            padding: 8px 15px;
+            background-color: #007acc;
+            color: #fff;
+            border-radius: 4px;
+            font-size: 14px;
+            text-align: center;
+            display: none;
+        }
+
+        .status-bar.error {
+            background-color: #e74c3c;
+        }
+
+        .status-bar.success {
+            background-color: #2ecc71;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div id="editor" class="editor"></div>
+        <div class="buttons">
+            <button id="execute_btn">Execute</button>
+            <button id="clear_btn">Clear</button>
+        </div>
+        <div id="status" class="status-bar"></div>
+    </div>
+
+    <!-- Monaco Editor Script -->
+    <script src="https://unpkg.com/monaco-editor@latest/min/vs/loader.js"></script>
+    <script>
+        let editor;
+
+        require.config({ paths: { 'vs': 'https://unpkg.com/monaco-editor@latest/min/vs' } });
+
+        require(['vs/editor/editor.main'], function() {
+            // Register Lua language
+            monaco.languages.register({ id: 'lua' });
+
+            monaco.languages.setMonarchTokensProvider('lua', {
+                tokenizer: {
+                    root: [
+                        [/\b(?:local|end|if|then|else|elseif|for|while|do|repeat|until|return)\b/, 'keyword'],
+                        [/\b(?:true|false|nil)\b/, 'boolean'],
+                        [/\b(?:function|print|require|return|assert|error|io|os|table|string|math|coroutine)\b/, 'function'],
+                        [/\b\d+\b/, 'number'],
+                        [/[a-zA-Z_][a-zA-Z0-9_]*/, 'identifier'],
+                        [/"(?:[^"\\]|\\.)*"/, 'string'],
+                        [/'(?:[^'\\]|\\.)*'/, 'string'],
+                        [/--.*/, 'comment']
+                    ]
+                }
+            });
+
+            monaco.languages.setLanguageConfiguration('lua', {
+                comments: {
+                    lineComment: '--',
+                },
+                brackets: [
+                    ['{', '}'],
+                    ['[', ']'],
+                    ['(', ')']
+                ],
+                autoClosingPairs: [
+                    { open: '{', close: '}' },
+                    { open: '[', close: ']' },
+                    { open: '(', close: ')' }
+                ],
+                surroundingPairs: [
+                    { open: '{', close: '}' },
+                    { open: '[', close: ']' },
+                    { open: '(', close: ')' }
+                ]
+            });
+
+            editor = monaco.editor.create(document.getElementById('editor'), {
+                value: '-- Write your Lua code here',
+                language: 'lua',
+                theme: 'vs-dark',
+                automaticLayout: true
+            });
+        });
+
+        function getText() {
+            return editor.getValue();
+        }
+
+        function setText(newText) {
+            editor.setValue(newText);
+        }
+
+        function showStatus(message, isError = false) {
+            const statusBar = document.getElementById('status');
+            statusBar.textContent = message;
+            statusBar.className = 'status-bar' + (isError ? ' error' : ' success');
+            statusBar.style.display = 'block';
+
+            setTimeout(() => {
+                statusBar.style.display = 'none';
+            }, 3000);
+        }
+
+        document.getElementById('execute_btn').addEventListener('click', function() {
+            const code = getText();
+            fetch('http://localhost:8000/loadstring', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'text/plain'
+                },
+                body: code
+            })
+            .then(response => response.text())
+            .then(data => {
+                //showStatus('Code executed successfully!', false);
+                console.log(data);
+            })
+            .catch(error => {
+                showStatus('Execution failed!', true);
+                console.error('Error:', error);
+            });
+        });
+
+        document.getElementById('clear_btn').addEventListener('click', function() {
+            setText(''); 
+            showStatus('Editor cleared', false);
+        });
+    </script>
+</body>
+</html>
